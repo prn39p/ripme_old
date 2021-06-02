@@ -87,18 +87,18 @@ public class TorController {
     public boolean shutDown() {
         boolean firstError = process == null;
         boolean secondError = client == null;
-        Utils.appendLog("1" + firstError , Color.RED);
-        Utils.appendLog("11" + secondError , Color.RED);
+        //Utils.appendLog("1" + firstError , Color.RED);
+        //Utils.appendLog("11" + secondError , Color.RED);
         if (process == null || client == null)
             return false;
         boolean error = client.quit();
-        Utils.appendLog("2" + error , Color.RED);
+        //Utils.appendLog("2" + error , Color.RED);
         error = client.disconnect() && error;
-        Utils.appendLog("3" + error , Color.RED);
+        //Utils.appendLog("3" + error , Color.RED);
         error = process.terminate() && error;
-        Utils.appendLog("4" + error , Color.RED);
+        //Utils.appendLog("4" + error , Color.RED);
         error = this.removeConfigFile() && error;
-        Utils.appendLog("5" + error , Color.RED);
+        //Utils.appendLog("5" + error , Color.RED);
         return error;
     }
 

@@ -7,13 +7,14 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Observable;
 import java.util.Scanner;
+
+import com.rarchives.ripme.torUtils.TorController;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 import org.jsoup.HttpStatusException;
@@ -40,6 +41,10 @@ public abstract class AbstractRipper
     RipStatusHandler observer = null;
 
     private boolean completed = true;
+
+    static String torExecutablePath = "/Applications/Tor Browser.app/Contents/Resources/TorBrowser/Tor/tor";
+    protected Proxy p;
+    public static TorController tor;
 
     public abstract void rip() throws IOException;
     public abstract String getHost();
@@ -184,6 +189,7 @@ public abstract class AbstractRipper
             fa.activateOptions();
         }
 
+        this.initillizeTor();
         this.threadPool = new DownloadThreadPool();
     }
 
@@ -679,4 +685,28 @@ public abstract class AbstractRipper
     protected boolean useByteProgessBar() { return false;}
     // If true ripme will try to resume a broken download for this ripper
     protected boolean tryResumeDownload() { return false;}
+
+    public void initillizeTor() {
+
+        if (tor == null) {
+            tor = new TorController(torExecutablePath);
+            if(!tor.startUp()){
+                System.err.println("Unable to start and connect to tor.");
+                System.exit(1);
+            }
+        }
+
+        SocketAddress proxyAddr = new InetSocketAddress("127.0.0.1", tor.getSocksPort());
+        p = new Proxy(Proxy.Type.SOCKS, proxyAddr);
+    }
+
+    public void closeTor() {
+
+        if (tor != null) {
+            if(!tor.shutDown()) {
+                System.err.println("Unable to shut down tor server.");
+                System.exit(1);
+            }
+        }
+    }
 }
