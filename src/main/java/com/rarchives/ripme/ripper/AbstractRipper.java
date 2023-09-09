@@ -21,8 +21,6 @@ import java.util.Observable;
 import java.util.Scanner;
 
 import com.rarchives.ripme.torUtils.TorController;
-import org.apache.log4j.FileAppender;
-import org.apache.log4j.Logger;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
