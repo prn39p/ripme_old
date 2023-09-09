@@ -3,7 +3,6 @@ package com.rarchives.ripme.ripper.rippers;
 import com.rarchives.ripme.ripper.AbstractJSONRipper;
 import com.rarchives.ripme.utils.Http;
 import com.rarchives.ripme.utils.Utils;
-import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -18,8 +17,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class DanbooruRipper extends AbstractJSONRipper {
-    private static final Logger logger = Logger.getLogger(DanbooruRipper.class);
-
     private static final String DOMAIN = "danbooru.donmai.us",
             HOST = "danbooru";
 
@@ -87,7 +84,7 @@ public class DanbooruRipper extends AbstractJSONRipper {
         try {
             return Utils.filesystemSafe(new URI(getTag(url).replaceAll("([?&])tags=", "")).getPath());
         } catch (URISyntaxException ex) {
-            logger.error(ex);
+            LOGGER.error(ex);
         }
 
         throw new MalformedURLException("Expected booru URL format: " + getDomain() + "/posts?tags=searchterm - got " + url + " instead");

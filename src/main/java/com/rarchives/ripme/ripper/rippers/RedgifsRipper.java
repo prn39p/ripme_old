@@ -4,6 +4,7 @@ import com.rarchives.ripme.ripper.AbstractHTMLRipper;
 import com.rarchives.ripme.utils.Http;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -55,12 +56,12 @@ public class RedgifsRipper extends AbstractHTMLRipper {
     }
 
     public Matcher isProfile() {
-        Pattern p = Pattern.compile("^https?://[wm.]*redgifs\\.com/users/([a-zA-Z0-9_-]+).*$");
+        Pattern p = Pattern.compile("^https?://[wm.]*redgifs\\.com/users/([a-zA-Z0-9_.-]+).*$");
         return p.matcher(url.toExternalForm());
     }
 
     public Matcher isSearch() {
-        Pattern p = Pattern.compile("^https?://[wm.]*redgifs\\.com/gifs/browse/([a-zA-Z0-9_-]+).*$");
+        Pattern p = Pattern.compile("^https?://[wm.]*redgifs\\.com/gifs/browse/([a-zA-Z0-9_.-]+).*$");
         return p.matcher(url.toExternalForm());
     }
 
@@ -76,10 +77,10 @@ public class RedgifsRipper extends AbstractHTMLRipper {
         } else if (isSearch().matches()) {
             searchText = getGID(url).replace("-", " ");
             return Http.url(
-                    new URL("https://napi.redgifs.com/v1/gfycats/search?search_text=" + searchText + "&count=" + searchCount + "&start=" + searchStart*searchCount)).ignoreContentType().get();
+                    new URL("https://api.redgifs.com/v1/gfycats/search?search_text=" + searchText + "&count=" + searchCount + "&start=" + searchStart*searchCount)).ignoreContentType().get();
         } else {
             username = getGID(url);
-            return Http.url(new URL("https://napi.redgifs.com/v1/users/" +  username + "/gfycats?count=" + count))
+            return Http.url(new URL("https://api.redgifs.com/v1/users/" +  username + "/gfycats?count=" + count))
                        .ignoreContentType().get();
         }
     }
@@ -126,15 +127,15 @@ public class RedgifsRipper extends AbstractHTMLRipper {
     public Document getNextPage(Document doc) throws IOException {
         if (isSearch().matches()) {
             Document d = Http.url(
-                    new URL("https://napi.redgifs.com/v1/gfycats/search?search_text=" + searchText
+                    new URL("https://api.redgifs.com/v1/gfycats/search?search_text=" + searchText
                                     + "&count=" + searchCount + "&start=" + searchCount*++searchStart))
                        .ignoreContentType().get();
             return (hasURLs(d).isEmpty()) ? null : d;
         } else {
-            if (cursor.equals("")) {
+            if (cursor.equals("") || cursor.equals("null")) {
                 return null;
             } else {
-                Document d =  Http.url(new URL("https://napi.redgifs.com/v1/users/" +  username + "/gfycats?count=" + count + "&cursor=" + cursor)).ignoreContentType().get();
+                Document d =  Http.url(new URL("https://api.redgifs.com/v1/users/" +  username + "/gfycats?count=" + count + "&cursor=" + cursor)).ignoreContentType().get();
                 return (hasURLs(d).isEmpty()) ? null : d;
             }
         }
@@ -151,7 +152,8 @@ public class RedgifsRipper extends AbstractHTMLRipper {
                 String json = el.html();
                 if (json.startsWith("{")) {
                     JSONObject page = new JSONObject(json);
-                    result.add(page.getJSONObject("video").getString("contentUrl"));
+                    result.add(page.getJSONObject("video").getString("contentUrl")
+                            .replace("-mobile", ""));
                 }
             }
         }
@@ -170,7 +172,7 @@ public class RedgifsRipper extends AbstractHTMLRipper {
         for (int i = 0; i < content.length(); i++) {
             result.add(content.getJSONObject(i).getString("mp4Url"));
         }
-        cursor = page.getString("cursor");
+        cursor = page.get("cursor").toString();
         return result;
     }
 
@@ -192,10 +194,10 @@ public class RedgifsRipper extends AbstractHTMLRipper {
             String json = el.html();
             if (json.startsWith("{")) {
                 JSONObject page = new JSONObject(json);
-                return page.getJSONObject("video").getString("contentUrl");
+                String mobileUrl = page.getJSONObject("video").getString("contentUrl");
+                return mobileUrl.replace("-mobile", "");
             }
         }
         throw new IOException();
     }
-
 }

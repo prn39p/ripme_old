@@ -1,43 +1,17 @@
 package com.rarchives.ripme.ui;
 
-import java.awt.*;
-import java.awt.TrayIcon.MessageType;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.io.*;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
-import java.util.List;
+import com.rarchives.ripme.ripper.AbstractRipper;
+import com.rarchives.ripme.utils.RipUtils;
+import com.rarchives.ripme.utils.Utils;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
 
 import javax.imageio.ImageIO;
-import javax.swing.DefaultListModel;
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JFileChooser;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JProgressBar;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.JTextField;
-import javax.swing.JTextPane;
-import javax.swing.ListSelectionModel;
-import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
+import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -48,24 +22,37 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
-
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.FileAppender;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-
-import com.rarchives.ripme.ripper.AbstractRipper;
-import com.rarchives.ripme.utils.RipUtils;
-import com.rarchives.ripme.utils.Utils;
-
-import javax.swing.UnsupportedLookAndFeelException;
+import java.awt.*;
+import java.awt.TrayIcon.MessageType;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * Everything UI-related starts and ends here.
  */
 public final class MainWindow implements Runnable, RipStatusHandler {
 
-    private static final Logger LOGGER = Logger.getLogger(MainWindow.class);
+    private static final Logger LOGGER = LogManager.getLogger(MainWindow.class);
 
     private boolean isRipping = false; // Flag to indicate if we're ripping something
 
@@ -98,7 +85,6 @@ public final class MainWindow implements Runnable, RipStatusHandler {
     public static JButton optionQueue;
     private static JPanel queuePanel;
     private static DefaultListModel<Object> queueListModel;
-    private static QueueMenuMouseListener queueMenuMouseListener;
 
     // Configuration
     private static JButton optionConfiguration;
@@ -111,6 +97,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
     private static JLabel configSaveDirLabel;
     private static JButton configSaveDirButton;
     private static JTextField configRetriesText;
+    private JTextField configRetrySleepText;
     private static JCheckBox configAutoupdateCheckbox;
     private static JComboBox<String> configLogLevelCombobox;
     private static JCheckBox configURLHistoryCheckbox;
@@ -128,6 +115,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
     private static JLabel configThreadsLabel;
     private static JLabel configTimeoutLabel;
     private static JLabel configRetriesLabel;
+    private static JLabel configRetrySleepLabel;
     // This doesn't really belong here but I have no idea where else to put it
     private static JButton configUrlFileChooserButton;
 
@@ -144,7 +132,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             model = queueListModel;
 
         if (model.size() > 0) {
-            Utils.setConfigList("queue", (Enumeration<Object>) model.elements());
+            Utils.setConfigList("queue", model.elements());
             Utils.saveConfig();
         }
 
@@ -175,7 +163,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
         queueListModel.addElement(url);
     }
 
-    public MainWindow() {
+    public MainWindow() throws IOException {
         mainFrame = new JFrame("RipMe v" + UpdateUtils.getThisJarVersion());
         mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         mainFrame.setLayout(new GridBagLayout());
@@ -271,6 +259,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
         try {
             setupTrayIcon();
         } catch (Exception e) {
+            LOGGER.warn(e.getMessage());
         }
 
         EmptyBorder emptyBorder = new EmptyBorder(5, 5, 5, 5);
@@ -360,6 +349,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             icon = ImageIO.read(getClass().getClassLoader().getResource("gear.png"));
             optionConfiguration.setIcon(new ImageIcon(icon));
         } catch (Exception e) {
+            LOGGER.warn(e.getMessage());
         }
         gbc.gridx = 0;
         optionsPanel.add(optionLog, gbc);
@@ -483,6 +473,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
         queueListModel = new DefaultListModel();
         JList queueList = new JList(queueListModel);
         queueList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+        QueueMenuMouseListener queueMenuMouseListener;
         queueList.addMouseListener(
                 queueMenuMouseListener = new QueueMenuMouseListener(d -> updateQueue(queueListModel)));
         JScrollPane queueListScroll = new JScrollPane(queueList, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
@@ -513,9 +504,12 @@ public final class MainWindow implements Runnable, RipStatusHandler {
         configThreadsLabel = new JLabel(Utils.getLocalizedString("max.download.threads") + ":", JLabel.RIGHT);
         configTimeoutLabel = new JLabel(Utils.getLocalizedString("timeout.mill"), JLabel.RIGHT);
         configRetriesLabel = new JLabel(Utils.getLocalizedString("retry.download.count"), JLabel.RIGHT);
-        configThreadsText = new JTextField(Integer.toString(Utils.getConfigInteger("threads.size", 3)));
-        configTimeoutText = new JTextField(Integer.toString(Utils.getConfigInteger("download.timeout", 60000)));
-        configRetriesText = new JTextField(Integer.toString(Utils.getConfigInteger("download.retries", 3)));
+        configRetrySleepLabel = new JLabel(Utils.getLocalizedString("retry.sleep.mill"), JLabel.RIGHT);
+        configThreadsText = configField("threads.size", 3);
+        configTimeoutText = configField("download.timeout", 60000);
+        configRetriesText = configField("download.retries", 3);
+        configRetrySleepText = configField("download.retry.sleep", 5000);
+
         configOverwriteCheckbox = addNewCheckbox(Utils.getLocalizedString("overwrite.existing.files"), "file.overwrite",
                 false);
         configAutoupdateCheckbox = addNewCheckbox(Utils.getLocalizedString("auto.update"), "auto.update", true);
@@ -552,24 +546,27 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             configSaveDirLabel.setForeground(Color.BLUE);
             configSaveDirLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
         } catch (Exception e) {
+            LOGGER.error(e);
         }
         configSaveDirLabel.setToolTipText(configSaveDirLabel.getText());
         configSaveDirLabel.setHorizontalAlignment(JLabel.RIGHT);
         configSaveDirButton = new JButton(Utils.getLocalizedString("select.save.dir") + "...");
 
-        addItemToConfigGridBagConstraints(gbc, 0, configUpdateLabel, configUpdateButton);
-        addItemToConfigGridBagConstraints(gbc, 1, configAutoupdateCheckbox, configLogLevelCombobox);
-        addItemToConfigGridBagConstraints(gbc, 2, configThreadsLabel, configThreadsText);
-        addItemToConfigGridBagConstraints(gbc, 3, configTimeoutLabel, configTimeoutText);
-        addItemToConfigGridBagConstraints(gbc, 4, configRetriesLabel, configRetriesText);
-        addItemToConfigGridBagConstraints(gbc, 5, configOverwriteCheckbox, configSaveOrderCheckbox);
-        addItemToConfigGridBagConstraints(gbc, 6, configPlaySound, configSaveLogs);
-        addItemToConfigGridBagConstraints(gbc, 7, configShowPopup, configSaveURLsOnly);
-        addItemToConfigGridBagConstraints(gbc, 8, configClipboardAutorip, configSaveAlbumTitles);
-        addItemToConfigGridBagConstraints(gbc, 9, configSaveDescriptions, configPreferMp4);
-        addItemToConfigGridBagConstraints(gbc, 10, configWindowPosition, configURLHistoryCheckbox);
-        addItemToConfigGridBagConstraints(gbc, 11, configSelectLangComboBox, configUrlFileChooserButton);
-        addItemToConfigGridBagConstraints(gbc, 12, configSaveDirLabel, configSaveDirButton);
+        var idx = 0;
+        addItemToConfigGridBagConstraints(gbc, idx++, configUpdateLabel, configUpdateButton);
+        addItemToConfigGridBagConstraints(gbc, idx++, configAutoupdateCheckbox, configLogLevelCombobox);
+        addItemToConfigGridBagConstraints(gbc, idx++, configThreadsLabel, configThreadsText);
+        addItemToConfigGridBagConstraints(gbc, idx++, configTimeoutLabel, configTimeoutText);
+        addItemToConfigGridBagConstraints(gbc, idx++, configRetriesLabel, configRetriesText);
+        addItemToConfigGridBagConstraints(gbc, idx++, configRetrySleepLabel, configRetrySleepText);
+        addItemToConfigGridBagConstraints(gbc, idx++, configOverwriteCheckbox, configSaveOrderCheckbox);
+        addItemToConfigGridBagConstraints(gbc, idx++, configPlaySound, configSaveLogs);
+        addItemToConfigGridBagConstraints(gbc, idx++, configShowPopup, configSaveURLsOnly);
+        addItemToConfigGridBagConstraints(gbc, idx++, configClipboardAutorip, configSaveAlbumTitles);
+        addItemToConfigGridBagConstraints(gbc, idx++, configSaveDescriptions, configPreferMp4);
+        addItemToConfigGridBagConstraints(gbc, idx++, configWindowPosition, configURLHistoryCheckbox);
+        addItemToConfigGridBagConstraints(gbc, idx++, configSelectLangComboBox, configUrlFileChooserButton);
+        addItemToConfigGridBagConstraints(gbc, idx++, configSaveDirLabel, configSaveDirButton);
 
         emptyPanel = new JPanel();
         emptyPanel.setPreferredSize(new Dimension(0, 0));
@@ -598,6 +595,40 @@ public final class MainWindow implements Runnable, RipStatusHandler {
         pane.add(emptyPanel, gbc);
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
+    }
+
+    private JTextField configField(String key, int defaultValue) {
+        final var field = new JTextField(Integer.toString(Utils.getConfigInteger(key, defaultValue)));
+        field.getDocument().addDocumentListener(new DocumentListener() {
+
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                checkAndUpdate();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                checkAndUpdate();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                checkAndUpdate();
+            }
+
+            private void checkAndUpdate() {
+                final var txt = field.getText();
+                try {
+                    final var newValue = Integer.parseInt(txt);
+                    if (newValue>0) {
+                        Utils.setConfigInteger(key, newValue);
+                    }
+                } catch (final Exception e) {
+                    LOGGER.warn(e.getMessage());
+                }
+            }
+        });
+        return field;
     }
 
     private void addItemToConfigGridBagConstraints(GridBagConstraints gbc, int gbcYValue, JLabel thing1ToAdd,
@@ -707,7 +738,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
                     if (!urlText.startsWith("http")) {
                         urlText = "http://" + urlText;
                     }
-                    URL url = new URL(urlText);
+                    URL url = new URI(urlText).toURL();
                     AbstractRipper ripper = AbstractRipper.getRipper(url);
                     statusWithColor(ripper.getHost() + " album detected", Color.GREEN);
                 } catch (Exception e) {
@@ -724,8 +755,8 @@ public final class MainWindow implements Runnable, RipStatusHandler {
                 statusProgress.setVisible(false);
                 pack();
                 statusProgress.setValue(0);
-                status(Utils.getLocalizedString("ripping.interrupted"));
-                appendLog("Ripper interrupted", Color.RED);
+                status(Utils.getLocalizedString("download.interrupted"));
+                appendLog("Download interrupted", Color.RED);
             }
         });
         optionLog.addActionListener(event -> {
@@ -801,6 +832,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             try {
                 historyTableModel.fireTableDataChanged();
             } catch (Exception e) {
+                LOGGER.warn(e.getMessage());
             }
             saveHistory();
         });
@@ -817,14 +849,12 @@ public final class MainWindow implements Runnable, RipStatusHandler {
                 checkChoise.add(noButton);
                 JFrame.setDefaultLookAndFeelDecorated(true);
                 JFrame frame = new JFrame("Are you sure?");
-                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
                 frame.add(checkChoise);
                 frame.setSize(405, 70);
                 frame.setVisible(true);
                 frame.setLocationRelativeTo(null);
-                noButton.addActionListener(e -> {
-                    frame.setVisible(false);
-                });
+                noButton.addActionListener(e -> frame.setVisible(false));
                 yesButton.addActionListener(ed -> {
                     frame.setVisible(false);
                     Utils.clearURLHistory();
@@ -832,6 +862,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
                     try {
                         historyTableModel.fireTableDataChanged();
                     } catch (Exception e) {
+                        LOGGER.warn(e.getMessage());
                     }
                     saveHistory();
                 });
@@ -841,6 +872,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
                 try {
                     historyTableModel.fireTableDataChanged();
                 } catch (Exception e) {
+                    LOGGER.warn(e.getMessage());
                 }
                 saveHistory();
             }
@@ -871,54 +903,56 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             t.start();
         });
         configLogLevelCombobox.addActionListener(arg0 -> {
-            String level = ((JComboBox) arg0.getSource()).getSelectedItem().toString();
+            String level = ((JComboBox<?>) arg0.getSource()).getSelectedItem().toString();
             setLogLevel(level);
         });
         configSelectLangComboBox.addActionListener(arg0 -> {
-            String level = ((JComboBox) arg0.getSource()).getSelectedItem().toString();
+            String level = ((JComboBox<?>) arg0.getSource()).getSelectedItem().toString();
             Utils.setLanguage(level);
             changeLocale();
         });
         configSaveDirLabel.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                File file = new File(Utils.getWorkingDirectory().toString());
-                Desktop desktop = Desktop.getDesktop();
+                Path file;
                 try {
-                    desktop.open(file);
-                } catch (Exception e1) {
+                    file = Utils.getWorkingDirectory();
+                    Desktop desktop = Desktop.getDesktop();
+                    desktop.open(file.toFile());
+                } catch (IOException ex) {
+                    LOGGER.warn(ex.getMessage());
                 }
             }
         });
         configSaveDirButton.addActionListener(arg0 -> {
             UIManager.put("FileChooser.useSystemExtensionHiding", false);
-            JFileChooser jfc = new JFileChooser(Utils.getWorkingDirectory());
+            JFileChooser jfc =  new JFileChooser(Utils.getWorkingDirectory().toString());
+            LOGGER.debug("select save directory, current is:" + Utils.getWorkingDirectory());
             jfc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
             int returnVal = jfc.showDialog(null, "select directory");
             if (returnVal != JFileChooser.APPROVE_OPTION) {
                 return;
             }
-            File chosenFile = jfc.getSelectedFile();
-            String chosenPath = null;
+            Path chosenPath;
             try {
-                chosenPath = chosenFile.getCanonicalPath();
+                chosenPath = jfc.getSelectedFile().toPath();
             } catch (Exception e) {
                 LOGGER.error("Error while getting selected path: ", e);
                 return;
             }
             configSaveDirLabel.setText(Utils.shortenPath(chosenPath));
-            Utils.setConfigString("rips.directory", chosenPath);
+            Utils.setConfigString("rips.directory", chosenPath.toString());
         });
         configUrlFileChooserButton.addActionListener(arg0 -> {
             UIManager.put("FileChooser.useSystemExtensionHiding", false);
-            JFileChooser jfc = new JFileChooser(Utils.getWorkingDirectory());
+            JFileChooser jfc =  new JFileChooser(Utils.getWorkingDirectory().toAbsolutePath().toString());
             jfc.setFileSelectionMode(JFileChooser.FILES_ONLY);
             int returnVal = jfc.showDialog(null, "Open");
             if (returnVal != JFileChooser.APPROVE_OPTION) {
                 return;
             }
             File chosenFile = jfc.getSelectedFile();
-            String chosenPath = null;
+            String chosenPath;
             try {
                 chosenPath = chosenFile.getCanonicalPath();
             } catch (Exception e) {
@@ -977,6 +1011,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
     }
 
     private void setLogLevel(String level) {
+        // default level is error, set in case something else is given.
         Level newLevel = Level.ERROR;
         level = level.substring(level.lastIndexOf(' ') + 1);
         switch (level) {
@@ -988,21 +1023,12 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             break;
         case "Warn":
             newLevel = Level.WARN;
-            break;
-        case "Error":
-            newLevel = Level.ERROR;
-            break;
         }
-        Logger.getRootLogger().setLevel(newLevel);
-        LOGGER.setLevel(newLevel);
-        ConsoleAppender ca = (ConsoleAppender) Logger.getRootLogger().getAppender("stdout");
-        if (ca != null) {
-            ca.setThreshold(newLevel);
-        }
-        FileAppender fa = (FileAppender) Logger.getRootLogger().getAppender("FILE");
-        if (fa != null) {
-            fa.setThreshold(newLevel);
-        }
+        LoggerContext ctx = (LoggerContext) LogManager.getContext(false);
+        Configuration config = ctx.getConfiguration();
+        LoggerConfig loggerConfig = config.getLoggerConfig(LogManager.ROOT_LOGGER_NAME);
+        loggerConfig.setLevel(newLevel);
+        ctx.updateLoggers();  // This causes all Loggers to refetch information from their LoggerConfig.
     }
 
     private void setupTrayIcon() {
@@ -1050,6 +1076,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
                 }
                 about.append("</ul>");
             } catch (Exception e) {
+                LOGGER.warn(e.getMessage());
             }
             about.append("<br>And download videos from video sites:");
             try {
@@ -1066,6 +1093,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
                 }
                 about.append("</ul>");
             } catch (Exception e) {
+                LOGGER.warn(e.getMessage());
             }
 
             about.append("Do you want to visit the project homepage on Github?");
@@ -1114,7 +1142,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
         } catch (IOException | AWTException e) {
             // TODO implement proper stack trace handling this is really just intented as a
             // placeholder until you implement proper error handling
-            e.printStackTrace();
+            LOGGER.warn(e.getMessage());
         }
     }
 
@@ -1145,6 +1173,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
                 sd.insertString(sd.getLength(), text + "\n", sas);
             }
         } catch (BadLocationException e) {
+            LOGGER.warn(e.getMessage());
         }
 
         logText.setCaretPosition(sd.getLength());
@@ -1161,8 +1190,8 @@ public final class MainWindow implements Runnable, RipStatusHandler {
         LOGGER.error(line);
     }
 
-    private void loadHistory() {
-        File historyFile = new File(Utils.getConfigDir() + File.separator + "history.json");
+    private void loadHistory() throws IOException {
+        File historyFile = new File(Utils.getConfigDir() + "/history.json");
         HISTORY.clear();
         if (historyFile.exists()) {
             try {
@@ -1181,25 +1210,24 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             if (HISTORY.toList().isEmpty()) {
                 // Loaded from config, still no entries.
                 // Guess rip history based on rip folder
-                String[] dirs = Utils.getWorkingDirectory()
-                        .list((dir, file) -> new File(dir.getAbsolutePath() + File.separator + file).isDirectory());
-                if (dirs != null) {
-                    for (String dir : dirs) {
-                        String url = RipUtils.urlFromDirectoryName(dir);
-                        if (url != null) {
-                            // We found one, add it to history
-                            HistoryEntry entry = new HistoryEntry();
-                            entry.url = url;
-                            HISTORY.add(entry);
-                        }
+                Stream<Path> stream = Files.list(Utils.getWorkingDirectory())
+                        .filter(Files::isDirectory);
+
+                stream.forEach(dir -> {
+                    String url = RipUtils.urlFromDirectoryName(dir.toString());
+                    if (url != null) {
+                        // We found one, add it to history
+                        HistoryEntry entry = new HistoryEntry();
+                        entry.url = url;
+                        HISTORY.add(entry);
                     }
-                }
+                });
             }
         }
     }
 
     private void saveHistory() {
-        Path historyFile = Paths.get(Utils.getConfigDir() + File.separator + "history.json");
+        Path historyFile = Paths.get(Utils.getConfigDir() + "/history.json");
         try {
             if (!Files.exists(historyFile)) {
                 Files.createDirectories(historyFile.getParent());
@@ -1216,7 +1244,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
     private void ripNextAlbum() {
         isRipping = true;
         // Save current state of queue to configuration.
-        Utils.setConfigList("queue", (Enumeration<Object>) queueListModel.elements());
+        Utils.setConfigList("queue", queueListModel.elements());
 
         if (queueListModel.isEmpty()) {
             // End of queue
@@ -1252,10 +1280,10 @@ public final class MainWindow implements Runnable, RipStatusHandler {
         if (!urlString.startsWith("http")) {
             urlString = "http://" + urlString;
         }
-        URL url = null;
+        URL url;
         try {
-            url = new URL(urlString);
-        } catch (MalformedURLException e) {
+            url = new URI(urlString).toURL();
+        } catch (MalformedURLException | URISyntaxException e) {
             LOGGER.error("[!] Could not generate URL for '" + urlString + "'", e);
             error("Given URL is not valid, expecting http://website.com/page/...");
             return null;
@@ -1312,7 +1340,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             if (!urlText.startsWith("http")) {
                 urlText = "http://" + urlText;
             }
-            URL url = new URL(urlText);
+            URL url = new URI(urlText).toURL();
             // Ripper is needed here to throw/not throw an Exception
             AbstractRipper ripper = AbstractRipper.getRipper(url);
             return true;
@@ -1382,34 +1410,34 @@ public final class MainWindow implements Runnable, RipStatusHandler {
         switch (msg.getStatus()) {
         case LOADING_RESOURCE:
         case DOWNLOAD_STARTED:
-            if (LOGGER.isEnabledFor(Level.INFO)) {
+            if (LOGGER.isEnabled(Level.INFO)) {
                 appendLog("Downloading " + msg.getObject(), Color.BLACK);
             }
             break;
         case DOWNLOAD_COMPLETE:
-            if (LOGGER.isEnabledFor(Level.INFO)) {
+            if (LOGGER.isEnabled(Level.INFO)) {
                 appendLog("Downloaded " + msg.getObject(), Color.GREEN);
             }
             break;
         case DOWNLOAD_COMPLETE_HISTORY:
-            if (LOGGER.isEnabledFor(Level.INFO)) {
+            if (LOGGER.isEnabled(Level.INFO)) {
                 appendLog("" + msg.getObject(), Color.GREEN);
             }
             break;
 
         case DOWNLOAD_ERRORED:
-            if (LOGGER.isEnabledFor(Level.ERROR)) {
+            if (LOGGER.isEnabled(Level.ERROR)) {
                 appendLog((String) msg.getObject(), Color.RED);
             }
             break;
         case DOWNLOAD_WARN:
-            if (LOGGER.isEnabledFor(Level.WARN)) {
+            if (LOGGER.isEnabled(Level.WARN)) {
                 appendLog((String) msg.getObject(), Color.ORANGE);
             }
             break;
 
         case RIP_ERRORED:
-            if (LOGGER.isEnabledFor(Level.ERROR)) {
+            if (LOGGER.isEnabled(Level.ERROR)) {
                 appendLog((String) msg.getObject(), Color.RED);
             }
             stopButton.setEnabled(false);
@@ -1436,6 +1464,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
                 try {
                     entry.title = ripper.getAlbumTitle(ripper.getURL());
                 } catch (MalformedURLException e) {
+                    LOGGER.warn(e.getMessage());
                 }
                 HISTORY.add(entry);
                 historyTableModel.fireTableDataChanged();
@@ -1448,7 +1477,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             statusProgress.setValue(0);
             statusProgress.setVisible(false);
             openButton.setVisible(true);
-            File f = rsc.dir;
+            Path f = rsc.dir;
             String prettyFile = Utils.shortenPath(f);
             openButton.setText(Utils.getLocalizedString("open") + prettyFile);
             mainFrame.setTitle("RipMe v" + UpdateUtils.getThisJarVersion());
@@ -1456,6 +1485,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
                 Image folderIcon = ImageIO.read(getClass().getClassLoader().getResource("folder.png"));
                 openButton.setIcon(new ImageIcon(folderIcon));
             } catch (Exception e) {
+                LOGGER.warn(e.getMessage());
             }
             /*
              * content key %path% the path to the album folder %url% is the album url
@@ -1466,7 +1496,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
                 try {
                     String commandToRun = Utils.getConfigString("finish.command", "ls");
                     commandToRun = commandToRun.replaceAll("%url%", url);
-                    commandToRun = commandToRun.replaceAll("%path%", f.getAbsolutePath());
+                    commandToRun = commandToRun.replaceAll("%path%", f.toAbsolutePath().toString());
                     LOGGER.info("RUnning command " + commandToRun);
                     // code from:
                     // https://stackoverflow.com/questions/5711084/java-runtime-getruntime-getting-output-from-executing-a-command-line-program
@@ -1492,7 +1522,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
                     LOGGER.error(e.getStackTrace());
                 }
             }
-            appendLog("Rip complete, saved to " + f.getAbsolutePath(), Color.GREEN);
+            appendLog("Rip complete, saved to " + f, Color.GREEN);
             openButton.setActionCommand(f.toString());
             openButton.addActionListener(event -> {
                 try {
@@ -1511,7 +1541,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             // Update total bytes
             break;
         case NO_ALBUM_OR_USER:
-            if (LOGGER.isEnabledFor(Level.ERROR)) {
+            if (LOGGER.isEnabled(Level.ERROR)) {
                 appendLog((String) msg.getObject(), Color.RED);
             }
             stopButton.setEnabled(false);
@@ -1532,14 +1562,6 @@ public final class MainWindow implements Runnable, RipStatusHandler {
     public static void ripAlbumStatic(String url) {
         ripTextfield.setText(url.trim());
         ripButton.doClick();
-    }
-
-    public static void enableWindowPositioning() {
-        Utils.setConfigBoolean("window.position", true);
-    }
-
-    public static void disableWindowPositioning() {
-        Utils.setConfigBoolean("window.position", false);
     }
 
     private static boolean hasWindowPositionBug() {

@@ -56,11 +56,6 @@ public class ImagevenueRipper extends AbstractHTMLRipper {
                         + " Got: " + url);
     }
 
-    @Override
-    public Document getFirstPage() throws IOException {
-        return Http.url(url).get();
-    }
-
     public List<String> getURLsFromPage(Document doc) {
         List<String> imageURLs = new ArrayList<>();
         for (Element thumb : doc.select("a[target=_blank]")) {
@@ -79,9 +74,9 @@ public class ImagevenueRipper extends AbstractHTMLRipper {
      *
      * Handles case when site has IP-banned the user.
      */
-    private class ImagevenueImageThread extends Thread {
-        private URL url;
-        private int index;
+    private class ImagevenueImageThread implements Runnable {
+        private final URL url;
+        private final int index;
 
         ImagevenueImageThread(URL url, int index) {
             super();

@@ -64,8 +64,7 @@ public class HqpornerRipper extends AbstractHTMLRipper {
 
 	@Override
 	public Document getFirstPage() throws IOException {
-		// "url" is an instance field of the superclass
-		return Http.url(url).get();
+		return super.getFirstPage();
 	}
 
 	@Override
@@ -130,7 +129,7 @@ public class HqpornerRipper extends AbstractHTMLRipper {
 		return true;
 	}
 
-	private class HqpornerDownloadThread extends Thread {
+	private class HqpornerDownloadThread implements Runnable {
 
 		private URL hqpornerVideoPageUrl;
 		//private int index;

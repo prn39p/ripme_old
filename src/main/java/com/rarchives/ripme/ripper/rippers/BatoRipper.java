@@ -13,7 +13,6 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
 import com.rarchives.ripme.ripper.AbstractHTMLRipper;
-import com.rarchives.ripme.utils.Http;
 
 public class BatoRipper extends AbstractHTMLRipper {
 
@@ -73,7 +72,7 @@ public class BatoRipper extends AbstractHTMLRipper {
     public String getAlbumTitle(URL url) throws MalformedURLException {
         try {
             // Attempt to use album title as GID
-            return getHost() + "_" + getGID(url) + "_" + getFirstPage().select("title").first().text().replaceAll(" ", "_");
+            return getHost() + "_" + getGID(url) + "_" + getCachedFirstPage().select("title").first().text().replaceAll(" ", "_");
         } catch (IOException e) {
             // Fall back to default album naming convention
             LOGGER.info("Unable to find title at " + url);
@@ -94,11 +93,6 @@ public class BatoRipper extends AbstractHTMLRipper {
         return m.matches();
     }
 
-    @Override
-    public Document getFirstPage() throws IOException {
-        // "url" is an instance field of the superclass
-        return Http.url(url).get();
-    }
 
     @Override
     public List<String> getURLsFromPage(Document doc) {

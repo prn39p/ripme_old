@@ -2,6 +2,8 @@ package com.rarchives.ripme.ripper.rippers;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -20,7 +22,6 @@ import org.jsoup.nodes.Element;
 
 public class FlickrRipper extends AbstractHTMLRipper {
 
-    private Document albumDoc = null;
     private final DownloadThreadPool flickrThreadPool;
 
     private enum UrlType {
@@ -63,7 +64,7 @@ public class FlickrRipper extends AbstractHTMLRipper {
     }
 
     @Override
-    public URL sanitizeURL(URL url) throws MalformedURLException {
+    public URL sanitizeURL(URL url) throws MalformedURLException, URISyntaxException {
         String sUrl = url.toExternalForm();
         // Strip out https
         sUrl = sUrl.replace("https://secure.flickr.com", "http://www.flickr.com");
@@ -74,7 +75,7 @@ public class FlickrRipper extends AbstractHTMLRipper {
             }
             sUrl += "pool";
         }
-        return new URL(sUrl);
+        return new URI(sUrl).toURL();
     }
     // FLickr is one of those sites what includes a api key in sites javascript
     // TODO let the user provide their own api key
@@ -178,7 +179,7 @@ public class FlickrRipper extends AbstractHTMLRipper {
         }
         try {   
             // Attempt to use album title as GID
-            Document doc = getFirstPage();
+            Document doc = getCachedFirstPage();
             String user = url.toExternalForm();
             user = user.substring(user.indexOf("/photos/") + "/photos/".length());
             user = user.substring(0, user.indexOf("/"));
@@ -228,13 +229,6 @@ public class FlickrRipper extends AbstractHTMLRipper {
                         + " Got: " + url);
     }
 
-    @Override
-    public Document getFirstPage() throws IOException {
-        if (albumDoc == null) {
-            albumDoc = Http.url(url).get();
-        }
-        return albumDoc;
-    }
 
     @Override
     public List<String> getURLsFromPage(Document doc) {

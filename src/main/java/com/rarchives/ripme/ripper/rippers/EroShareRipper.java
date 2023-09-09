@@ -97,7 +97,7 @@ public class EroShareRipper extends AbstractHTMLRipper {
         if (!is_profile(url)) {
             try {
                 // Attempt to use album title as GID
-                Element titleElement = getFirstPage().select("meta[property=og:title]").first();
+                Element titleElement = getCachedFirstPage().select("meta[property=og:title]").first();
                 String title = titleElement.attr("content");
                 title = title.substring(title.lastIndexOf('/') + 1);
                 return getHost() + "_" + getGID(url) + "_" + title.trim();
@@ -119,7 +119,6 @@ public class EroShareRipper extends AbstractHTMLRipper {
         for (Element img : imgs) {
             if (img.hasClass("album-image")) {
                 String imageURL = img.attr("src");
-                imageURL = imageURL;
                 URLs.add(imageURL);
             }
         }

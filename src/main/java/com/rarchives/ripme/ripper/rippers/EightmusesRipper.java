@@ -23,13 +23,7 @@ import com.rarchives.ripme.utils.Http;
 
 public class EightmusesRipper extends AbstractHTMLRipper {
 
-    private Document albumDoc = null;
     private Map<String,String> cookies = new HashMap<>();
-    // TODO put up a wiki page on using maps to store titles
-    // the map for storing the title of each album when downloading sub albums
-    private Map<URL,String> urlTitles = new HashMap<>();
-
-    private Boolean rippingSubalbums = false;
 
     public EightmusesRipper(URL url) throws IOException {
         super(url);
@@ -64,7 +58,7 @@ public class EightmusesRipper extends AbstractHTMLRipper {
     public String getAlbumTitle(URL url) throws MalformedURLException {
         try {
             // Attempt to use album title as GID
-            Element titleElement = getFirstPage().select("meta[name=description]").first();
+            Element titleElement = getCachedFirstPage().select("meta[name=description]").first();
             String title = titleElement.attr("content");
             title = title.replace("A huge collection of free porn comics for adults. Read", "");
             title = title.replace("online for free at 8muses.com", "");
@@ -78,12 +72,9 @@ public class EightmusesRipper extends AbstractHTMLRipper {
 
     @Override
     public Document getFirstPage() throws IOException {
-        if (albumDoc == null) {
-            Response resp = Http.url(url).response();
-            cookies.putAll(resp.cookies());
-            albumDoc = resp.parse();
-        }
-        return albumDoc;
+        Response resp = Http.url(url).response();
+        cookies.putAll(resp.cookies());
+        return resp.parse();
     }
 
     @Override
@@ -124,7 +115,7 @@ public class EightmusesRipper extends AbstractHTMLRipper {
                         for (int i = 0; i != json.getJSONArray("pictures").length(); i++) {
                             image = "https://www.8muses.com/image/fl/" + json.getJSONArray("pictures").getJSONObject(i).getString("publicUri");
                             URL imageUrl = new URL(image);
-                            addURLToDownload(imageUrl, getPrefixShort(x), getSubdir(page.select("title").text()), this.url.toExternalForm(), cookies, "", null, true);
+                            addURLToDownload(imageUrl, getSubdir(page.select("title").text()), this.url.toExternalForm(), cookies, getPrefixShort(x), "", null, true);
                             // X is our page index
                             x++;
                             if (isThisATest()) {
@@ -186,9 +177,10 @@ public class EightmusesRipper extends AbstractHTMLRipper {
     private String deobfuscateChar(char c) {
         if ((int) c == 32) {
             return fromCharCode(32);
+        } else if ((int) c > 120){
+            return fromCharCode((int)c);
         }
         return fromCharCode(33 + (c + 14) % 94);
-
     }
 
     private static String fromCharCode(int... codePoints) {

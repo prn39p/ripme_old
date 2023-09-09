@@ -14,7 +14,6 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import com.rarchives.ripme.ripper.AbstractHTMLRipper;
-import com.rarchives.ripme.utils.Http;
 import java.util.HashMap;
 
 public class AerisdiesRipper extends AbstractHTMLRipper {
@@ -49,7 +48,7 @@ public class AerisdiesRipper extends AbstractHTMLRipper {
     @Override
     public String getAlbumTitle(URL url) throws MalformedURLException {
         try {
-            Element el = getFirstPage().select(".headtext").first();
+            Element el = getCachedFirstPage().select(".headtext").first();
             if (el == null) {
                 throw new IOException("Unable to get album title");
             }
@@ -60,11 +59,6 @@ public class AerisdiesRipper extends AbstractHTMLRipper {
             LOGGER.info("Unable to find title at " + url);
         }
         return super.getAlbumTitle(url);
-    }
-
-    @Override
-    public Document getFirstPage() throws IOException {
-        return Http.url(url).get();
     }
 
     @Override

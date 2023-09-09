@@ -8,7 +8,9 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Path;
 import java.util.Map;
 
 
@@ -21,7 +23,7 @@ public abstract class VideoRipper extends AbstractRipper {
         super(url);
     }
 
-    public abstract void rip() throws IOException;
+    public abstract void rip() throws IOException, URISyntaxException;
 
     public abstract String getHost();
 
@@ -43,10 +45,10 @@ public abstract class VideoRipper extends AbstractRipper {
     }
 
     @Override
-    public boolean addURLToDownload(URL url, File saveAs) {
+    public boolean addURLToDownload(URL url, Path saveAs) {
         if (Utils.getConfigBoolean("urls_only.save", false)) {
             // Output URL to file
-            String urlFile = this.workingDir + File.separator + "urls.txt";
+            String urlFile = this.workingDir + "/urls.txt";
 
             try (FileWriter fw = new FileWriter(urlFile, true)) {
                 fw.write(url.toExternalForm());
@@ -72,7 +74,7 @@ public abstract class VideoRipper extends AbstractRipper {
     }
 
     @Override
-    public boolean addURLToDownload(URL url, File saveAs, String referrer, Map<String, String> cookies, Boolean getFileExtFromMIME) {
+    public boolean addURLToDownload(URL url, Path saveAs, String referrer, Map<String, String> cookies, Boolean getFileExtFromMIME) {
         return addURLToDownload(url, saveAs);
     }
 
@@ -83,7 +85,9 @@ public abstract class VideoRipper extends AbstractRipper {
      */
     @Override
     public void setWorkingDir(URL url) throws IOException {
-        String path = Utils.getWorkingDirectory().getCanonicalPath();
+        Path wd = Utils.getWorkingDirectory();
+        // TODO - change to nio
+        String path = wd.toAbsolutePath().toString();
 
         if (!path.endsWith(File.separator)) {
             path += File.separator;
@@ -93,7 +97,7 @@ public abstract class VideoRipper extends AbstractRipper {
         workingDir = new File(path);
 
         if (!workingDir.exists()) {
-            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(workingDir));
+            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(workingDir.toPath()));
             workingDir.mkdirs();
         }
 
@@ -115,7 +119,7 @@ public abstract class VideoRipper extends AbstractRipper {
      * @param saveAs Path to file, including filename.
      */
     @Override
-    public void downloadCompleted(URL url, File saveAs) {
+    public void downloadCompleted(URL url, Path saveAs) {
         if (observer == null) {
             return;
         }
@@ -149,12 +153,11 @@ public abstract class VideoRipper extends AbstractRipper {
 
     /**
      * Runs if user tries to redownload an already existing File.
-     *
-     * @param url  Target URL
+     *  @param url  Target URL
      * @param file Existing file
      */
     @Override
-    public void downloadExists(URL url, File file) {
+    public void downloadExists(URL url, Path file) {
         if (observer == null) {
             return;
         }

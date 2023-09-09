@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -28,7 +27,6 @@ import org.jsoup.Connection;
 import org.jsoup.Connection.Method;
 import org.jsoup.Connection.Response;
 import org.jsoup.HttpStatusException;
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -518,8 +516,8 @@ public class DeviantartRipper extends AbstractHTMLRipper {
 	 * @author MrPlaygon
 	 *
 	 */
-	private class DeviantartImageThread extends Thread {
-		private URL url;
+	private class DeviantartImageThread implements Runnable {
+		private final URL url;
 
 		public DeviantartImageThread(URL url) {
 			this.url = url;

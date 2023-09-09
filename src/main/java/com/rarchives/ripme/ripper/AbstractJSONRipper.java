@@ -1,18 +1,23 @@
 package com.rarchives.ripme.ripper;
 
+import com.rarchives.ripme.ui.RipStatusMessage;
+import com.rarchives.ripme.ui.RipStatusMessage.STATUS;
+import com.rarchives.ripme.utils.Utils;
+import org.json.JSONObject;
+
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.json.JSONObject;
-import com.rarchives.ripme.ui.RipStatusMessage;
-import com.rarchives.ripme.ui.RipStatusMessage.STATUS;
-import com.rarchives.ripme.utils.Utils;
 
 /**
  * Simplified ripper, designed for ripping from sites by parsing JSON.
@@ -20,7 +25,7 @@ import com.rarchives.ripme.utils.Utils;
 public abstract class AbstractJSONRipper extends AbstractRipper {
     
     private Map<URL, File> itemsPending = Collections.synchronizedMap(new HashMap<URL, File>());
-    private Map<URL, File> itemsCompleted = Collections.synchronizedMap(new HashMap<URL, File>());
+    private Map<URL, Path> itemsCompleted = Collections.synchronizedMap(new HashMap<URL, Path>());
     private Map<URL, String> itemsErrored = Collections.synchronizedMap(new HashMap<URL, String>());
 
     protected AbstractJSONRipper(URL url) throws IOException {
@@ -140,11 +145,11 @@ public abstract class AbstractJSONRipper extends AbstractRipper {
     /**
      * Queues multiple URLs of single images to download from a single Album URL
      */
-    public boolean addURLToDownload(URL url, File saveAs, String referrer, Map<String,String> cookies, Boolean getFileExtFromMIME) {
-            // Only download one file if this is a test.
-        if (super.isThisATest() &&
-                (itemsPending.size() > 0 || itemsCompleted.size() > 0 || itemsErrored.size() > 0)) {
+    public boolean addURLToDownload(URL url, Path saveAs, String referrer, Map<String,String> cookies, Boolean getFileExtFromMIME) {
+        // Only download one file if this is a test.
+        if (super.isThisATest() && (itemsCompleted.size() > 0 || itemsErrored.size() > 0)) {
             stop();
+            itemsPending.clear();
             return false;
         }
         if (!allowDuplicates()
@@ -157,18 +162,18 @@ public abstract class AbstractJSONRipper extends AbstractRipper {
         }
         if (Utils.getConfigBoolean("urls_only.save", false)) {
             // Output URL to file
-            String urlFile = this.workingDir + File.separator + "urls.txt";
-            try (FileWriter fw = new FileWriter(urlFile, true)) {
-                fw.write(url.toExternalForm());
-                fw.write(System.lineSeparator());
-                itemsCompleted.put(url, new File(urlFile));
+            Path urlFile = Paths.get(this.workingDir + "/urls.txt");
+            String text = url.toExternalForm() + System.lineSeparator();
+            try {
+                Files.write(urlFile, text.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                itemsCompleted.put(url, urlFile);
             } catch (IOException e) {
                 LOGGER.error("Error while writing to " + urlFile, e);
             }
         }
         else {
-            itemsPending.put(url, saveAs);
-            DownloadFileThread dft = new DownloadFileThread(url,  saveAs,  this, getFileExtFromMIME);
+            itemsPending.put(url, saveAs.toFile());
+            DownloadFileThread dft = new DownloadFileThread(url,  saveAs.toFile(),  this, getFileExtFromMIME);
             if (referrer != null) {
                 dft.setReferrer(referrer);
             }
@@ -182,7 +187,7 @@ public abstract class AbstractJSONRipper extends AbstractRipper {
     }
 
     @Override
-    public boolean addURLToDownload(URL url, File saveAs) {
+    public boolean addURLToDownload(URL url, Path saveAs) {
         return addURLToDownload(url, saveAs, null, null, false);
     }
 
@@ -203,7 +208,7 @@ public abstract class AbstractJSONRipper extends AbstractRipper {
     /**
      * Cleans up & tells user about successful download
      */
-    public void downloadCompleted(URL url, File saveAs) {
+    public void downloadCompleted(URL url, Path saveAs) {
         if (observer == null) {
             return;
         }
@@ -240,14 +245,14 @@ public abstract class AbstractJSONRipper extends AbstractRipper {
      * Tells user that a single file in the album they wish to download has
      * already been downloaded in the past.
      */
-    public void downloadExists(URL url, File file) {
+    public void downloadExists(URL url, Path file) {
         if (observer == null) {
             return;
         }
 
         itemsPending.remove(url);
         itemsCompleted.put(url, file);
-        observer.update(this, new RipStatusMessage(STATUS.DOWNLOAD_WARN, url + " already saved as " + file.getAbsolutePath()));
+        observer.update(this, new RipStatusMessage(STATUS.DOWNLOAD_WARN, url + " already saved as " + file));
 
         checkIfComplete();
     }
@@ -274,10 +279,7 @@ public abstract class AbstractJSONRipper extends AbstractRipper {
      */
     @Override
     public void setWorkingDir(URL url) throws IOException {
-        String path = Utils.getWorkingDirectory().getCanonicalPath();
-        if (!path.endsWith(File.separator)) {
-            path += File.separator;
-        }
+        Path wd = Utils.getWorkingDirectory();
         String title;
         if (Utils.getConfigBoolean("album_titles.save", true)) {
             title = getAlbumTitle(this.url);
@@ -287,15 +289,13 @@ public abstract class AbstractJSONRipper extends AbstractRipper {
         LOGGER.debug("Using album title '" + title + "'");
 
         title = Utils.filesystemSafe(title);
-        path += title;
-        path = Utils.getOriginalDirectory(path) + File.separator;   // check for case sensitive (unix only)
-
-        this.workingDir = new File(path);
-        if (!this.workingDir.exists()) {
-            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(this.workingDir));
-            this.workingDir.mkdirs();
+        wd = wd.resolve(title);
+        if (!Files.exists(wd)) {
+            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(wd));
+            Files.createDirectory(wd);
         }
-        LOGGER.debug("Set working directory to: " + this.workingDir);
+        this.workingDir = wd.toFile();
+        LOGGER.info("Set working directory to: {}", this.workingDir);
     }
 
     /**

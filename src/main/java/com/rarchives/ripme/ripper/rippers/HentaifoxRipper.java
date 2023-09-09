@@ -12,7 +12,6 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
 import com.rarchives.ripme.ripper.AbstractHTMLRipper;
-import com.rarchives.ripme.utils.Http;
 
 public class HentaifoxRipper extends AbstractHTMLRipper {
 
@@ -42,12 +41,6 @@ public class HentaifoxRipper extends AbstractHTMLRipper {
     }
 
     @Override
-    public Document getFirstPage() throws IOException {
-        // "url" is an instance field of the superclass
-        return Http.url(url).get();
-    }
-
-    @Override
     public List<String> getURLsFromPage(Document doc) {
         LOGGER.info(doc);
         List<String> result = new ArrayList<>();
@@ -61,7 +54,7 @@ public class HentaifoxRipper extends AbstractHTMLRipper {
     @Override
     public String getAlbumTitle(URL url) throws MalformedURLException {
         try {
-            Document doc = getFirstPage();
+            Document doc = getCachedFirstPage();
             String title = doc.select("div.info > h1").first().text();
             return getHost() + "_" + title + "_" + getGID(url);
         } catch (Exception e) {

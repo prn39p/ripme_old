@@ -1,11 +1,9 @@
 package com.rarchives.ripme.ripper.rippers;
 
-import com.rarchives.ripme.ripper.AbstractRipper;
 import com.rarchives.ripme.ripper.AbstractSingleFileRipper;
 import com.rarchives.ripme.utils.Http;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -81,11 +79,6 @@ public class DuckmoviesRipper extends AbstractSingleFileRipper {
     }
 
     @Override
-    public Document getFirstPage() throws IOException {
-        return Http.url(this.url).get();
-    }
-
-    @Override
     public List<String> getURLsFromPage(Document doc) {
         List<String> results = new ArrayList<>();
         String duckMoviesUrl = doc.select("iframe").attr("src");
@@ -131,7 +124,7 @@ public class DuckmoviesRipper extends AbstractSingleFileRipper {
 
     @Override
     public void downloadURL(URL url, int index) {
-        addURLToDownload(url, "", "", null, null, AbstractRipper.getFileName(url, null, null).replaceAll("%20", "_"));
+        addURLToDownload(url, "", "", null, null, null);
     }
 
     @Override

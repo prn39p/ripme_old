@@ -29,8 +29,6 @@ public class NfsfwRipper extends AbstractHTMLRipper {
             "https?://[wm.]*nfsfw.com/gallery/v/[^/]+/(.+)$"
     );
 
-    // cached first page
-    private Document fstPage;
     // threads pool for downloading images from image pages
     private DownloadThreadPool nfsfwThreadPool;
 
@@ -47,13 +45,6 @@ public class NfsfwRipper extends AbstractHTMLRipper {
     @Override
     public String getHost() {
         return HOST;
-    }
-
-    @Override
-    protected Document getFirstPage() throws IOException {
-        // cache the first page
-        this.fstPage = Http.url(url).get();
-        return fstPage;
     }
 
     @Override
@@ -157,9 +148,15 @@ public class NfsfwRipper extends AbstractHTMLRipper {
 
     @Override
     public boolean pageContainsAlbums(URL url) {
-        List<String> imageURLs = getImagePageURLs(fstPage);
-        List<String> subalbumURLs = getSubalbumURLs(fstPage);
-        return imageURLs.isEmpty() && !subalbumURLs.isEmpty();
+        try {
+            final var fstPage = getCachedFirstPage();
+            List<String> imageURLs = getImagePageURLs(fstPage);
+            List<String> subalbumURLs = getSubalbumURLs(fstPage);
+            return imageURLs.isEmpty() && !subalbumURLs.isEmpty();
+        } catch (IOException e) {
+            LOGGER.error("Unable to load " + url, e);
+            return false;
+        }
     }
 
     @Override
@@ -196,10 +193,10 @@ public class NfsfwRipper extends AbstractHTMLRipper {
     /**
      * Helper class to find and download images found on "image" pages
      */
-    private class NfsfwImageThread extends Thread {
-        private URL url;
-        private String subdir;
-        private int index;
+    private class NfsfwImageThread implements Runnable {
+        private final URL url;
+        private final String subdir;
+        private final int index;
 
         NfsfwImageThread(URL url, String subdir, int index) {
             super();
