@@ -13,6 +13,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -146,7 +147,8 @@ public class XossipfapRipper extends AbstractHTMLRipper {
 
     @Override
     public void setWorkingDir(URL url) throws IOException {
-        String path = Utils.getWorkingDirectory().getCanonicalPath();
+        Path wd = Utils.getWorkingDirectory();
+        String path = wd.toAbsolutePath().toString();
         if (!path.endsWith(File.separator)) {
             path += File.separator;
         }
@@ -159,13 +161,16 @@ public class XossipfapRipper extends AbstractHTMLRipper {
         //title = HOST;
         LOGGER.debug("Using album title '" + title + "'");
 
+        title = Utils.filesystemSafe(title);
         path += title;
         path = Utils.getOriginalDirectory(path) + File.separator;   // check for case sensitive (unix only)
 
         this.workingDir = new File(path);
         if (!this.workingDir.exists()) {
-            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(this.workingDir));
-            this.workingDir.mkdirs();
+            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(this.workingDir.toPath()));
+            if (!this.workingDir.mkdirs()) {
+                throw new IOException("Failed creating dir: \"" + this.workingDir + "\"");
+            }
         }
         LOGGER.debug("Set working directory to: " + this.workingDir);
     }
