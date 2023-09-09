@@ -46,6 +46,7 @@ public class App {
     public static final Logger logger = LogManager.getLogger(App.class);
     public static String stringToAppendToFoldername = null;
     private static final History HISTORY = new History();
+    public static String torExecutablePath = "/Applications/Tor Browser.app/Contents/Resources/TorBrowser/Tor/tor";
 
     /**
      * Where everything starts. Takes in, and tries to parse as many commandline arguments as possible.

@@ -143,7 +143,7 @@ public class PornhubRipper extends AbstractHTMLRipper {
 
         private void fetchImage() {
             try {
-                Document doc = Http.url(this.url)
+                Document doc = Http.url(this.url, p)
                                    .referrer(this.url)
                                    .get();
 
