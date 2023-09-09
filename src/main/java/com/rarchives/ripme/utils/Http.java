@@ -1,6 +1,13 @@
 package com.rarchives.ripme.utils;
 
 import com.rarchives.ripme.ripper.AbstractRipper;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.Proxy;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -9,6 +16,8 @@ import org.json.JSONObject;
 import org.jsoup.Connection;
 import org.jsoup.Connection.Method;
 import org.jsoup.Connection.Response;
+//import org.jsoup.helper.StringUtil;
+import org.jsoup.Jsoup;
 import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -55,10 +64,42 @@ public class Http {
         return new Http(url);
     }
 
+    public Http(String url, Proxy p) {
+        this.url = url;
+        defaultSettings(p);
+    }
+
+    private Http(URL url, Proxy p) {
+        this.url = url.toExternalForm();
+        defaultSettings(p);
+    }
+
+    public static Http url(URL url, java.net.Proxy p) {
+        return new Http(url, p);
+    }
+
+    public static Http url(String url, Proxy p) {
+        return new Http(url, p);
+    }
+
     private void defaultSettings() {
         this.retries = Utils.getConfigInteger("download.retries", 1);
         this.retrySleep = Utils.getConfigInteger("download.retry.sleep", 5000);
         connection = Jsoup.connect(this.url);
+        connection.userAgent(AbstractRipper.USER_AGENT);
+        connection.method(Method.GET);
+        connection.timeout(TIMEOUT);
+        connection.maxBodySize(0);
+
+        // Extract cookies from config entry:
+        // Example config entry:
+        // cookies.reddit.com = reddit_session=<value>; other_cookie=<value>
+        connection.cookies(cookiesForURL(this.url));
+    }
+
+    private void defaultSettings(Proxy p) {
+        this.retries = Utils.getConfigInteger("download.retries", 1);
+        connection = Jsoup.connect(this.url).proxy(p);
         connection.userAgent(AbstractRipper.USER_AGENT);
         connection.method(Method.GET);
         connection.timeout(TIMEOUT);
