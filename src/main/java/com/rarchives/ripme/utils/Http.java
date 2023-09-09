@@ -10,6 +10,7 @@ import java.util.Map;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.jsoup.Connection;
 import org.jsoup.Connection.Method;
@@ -202,6 +203,12 @@ public class Http {
         ignoreContentType();
         String jsonString = response().body();
         return new JSONObject(jsonString);
+    }
+
+    public JSONArray getJSONArray() throws IOException {
+        ignoreContentType();
+        String jsonArray = response().body();
+        return new JSONArray(jsonArray);
     }
 
     public Response response() throws IOException {
